@@ -11,7 +11,7 @@ bool ZipDir::Prepare(file f)
 		|| m_CDREnd.nCDRStartDisk != 0
 		|| m_CDREnd.numEntriesOnDisk != m_CDREnd.numEntriesTotal)
 	{
-		printf("CE: Multivolume archive detected. Current version of ZipDir does not support multivolume archives");
+		LOGMSG("CE: Multivolume archive detected. Current version of ZipDir does not support multivolume archives");
 		return false;
 	}
 
@@ -19,7 +19,7 @@ bool ZipDir::Prepare(file f)
 		|| m_CDREnd.lCDRSize > m_nCDREndPos
 		|| m_CDREnd.lCDROffset + m_CDREnd.lCDRSize > m_nCDREndPos)
 	{
-		printf("CE: The central directory offset or size are out of range, the pak is probably corrupt, try to repare or delete the file");
+		LOGMSG("CE: The central directory offset or size are out of range, the pak is probably corrupt, try to repare or delete the file");
 		return false;
 	}
 
@@ -29,7 +29,7 @@ bool ZipDir::Prepare(file f)
 
 		if (!fread_b(&m_headerExtended, sizeof(CustomExtendedHeader), f))
 		{
-			printf("fread_b -> m_headerExtended");
+			LOGMSG("fread_b -> m_headerExtended");
 			return false;
 		}
 
@@ -37,19 +37,19 @@ bool ZipDir::Prepare(file f)
 		{
 			if (!fread_b(&m_headerEncryption, sizeof(CustomEncryptionHeader), f))
 			{
-				printf("fread_b -> m_headerEncryption");
+				LOGMSG("fread_b -> m_headerEncryption");
 				return false;
 			}
 
 			if (m_headerEncryption.nHeaderSize != sizeof(CustomEncryptionHeader))
 			{
-				printf("m_headerEncryption.nHeaderSize != sizeof(CustomEncryptionHeader)");
+				LOGMSG("m_headerEncryption.nHeaderSize != sizeof(CustomEncryptionHeader)");
 				return false;
 			}
 
 			if (!DecryptKeysTable())
 			{
-				printf("Failed to DecryptKeysTable");
+				LOGMSG("Failed to DecryptKeysTable");
 				return false;
 			}
 		}
@@ -64,7 +64,7 @@ bool ZipDir::FindCDREnd(file f)
 
 	if (nFileSize < sizeof(CDREnd))
 	{
-		printf("CE: The file is too small, it doesn't even contain the CDREnd structure. Please check and delete the file. Truncated files are not deleted automatically");
+		LOGMSG("CE: The file is too small, it doesn't even contain the CDREnd structure. Please check and delete the file. Truncated files are not deleted automatically");
 		return false;
 	}
 
@@ -99,7 +99,7 @@ bool ZipDir::FindCDREnd(file f)
 
 		if (nNewBufPos >= nOldBufPos)
 		{
-			printf("CE: Cant find central directory (CDR)");
+			LOGMSG("CE: Cant find central directory (CDR)");
 			return false;
 		}
 
@@ -119,7 +119,7 @@ bool ZipDir::FindCDREnd(file f)
 				}
 				else
 				{
-					printf("CE: Central Directory Record is followed by a comment of inconsistent length. This might be a minor misconsistency, please try to repair the file. However, it is dangerous to open the file because I will have to guess some structure offsets, which can lead to permanent unrecoverable damage of the archive content");
+					LOGMSG("CE: Central Directory Record is followed by a comment of inconsistent length. This might be a minor misconsistency, please try to repair the file. However, it is dangerous to open the file because I will have to guess some structure offsets, which can lead to permanent unrecoverable damage of the archive content");
 					return false;
 				}
 			}
@@ -135,7 +135,7 @@ bool ZipDir::FindCDREnd(file f)
 		nOldBufPos = nNewBufPos;
 		memmove(pReservedBuffer + g_nCDRSearchWindowSize, pWindow, sizeof(CDREnd) - 1);
 	}
-	printf("CE: The program flow may not have possibly lead here. This error is unexplainable");
+	LOGMSG("CE: The program flow may not have possibly lead here. This error is unexplainable");
 }
 
 
@@ -148,7 +148,7 @@ bool ZipDir::DecryptKeysTable() {
 	outlen = sizeof(buf);
 	if (ZipEncrypt::custom_rsa_decrypt_key_ex(m_headerEncryption.CDR_encrypted_key, 128, buf, &outlen, NULL, 0, hash, LTC_LTC_PKCS_1_OAEP, &stat, &g_rsa_key_public_for_sign) != CRYPT_OK || stat != 1 || outlen != 16)
 	{
-		printf("custom_rsa_decrypt_key_ex m_headerEncryption.CDR_encrypted_key");
+		LOGMSG("custom_rsa_decrypt_key_ex m_headerEncryption.CDR_encrypted_key");
 		return false;
 	}
 	memcpy(m_block_cipher_cdr_key, buf, 16);
@@ -156,7 +156,7 @@ bool ZipDir::DecryptKeysTable() {
 		outlen = sizeof(buf);
 		if (ZipEncrypt::custom_rsa_decrypt_key_ex(m_headerEncryption.keys_table[i], 128, buf, &outlen, NULL, 0, hash, LTC_LTC_PKCS_1_OAEP, &stat, &g_rsa_key_public_for_sign) != CRYPT_OK || stat != 1 || outlen != 16)
 		{
-			printf("custom_rsa_decrypt_key_ex m_headerEncryption.keys_table[%i]", i);
+			LOGMSG("custom_rsa_decrypt_key_ex m_headerEncryption.keys_table[%i]", i);
 			return false;
 		}
 		memcpy(m_block_cipher_keys_table[i], buf, 16);
@@ -216,7 +216,7 @@ bool ZipDir::BuildFileEntryMap(file f, file fo, bool older_support)
 	fseek_(fo, m_nCDREndPos, SEEK_SET);
 	if (!fwrite_b(&m_CDREnd, sizeof(CDREnd), fo))
 	{
-		printf("fwrite_b -> m_CDREnd");
+		LOGMSG("fwrite_b -> m_CDREnd");
 		return false;
 	}
 
@@ -226,7 +226,7 @@ bool ZipDir::BuildFileEntryMap(file f, file fo, bool older_support)
 	fseek_(f, m_CDREnd.lCDROffset, SEEK_SET);
 	if (!fread_b(pDest, m_CDREnd.lCDRSize, f))
 	{
-		printf("fread_b -> pDest");
+		LOGMSG("fread_b -> pDest");
 		return false;
 	}
 
@@ -234,7 +234,7 @@ bool ZipDir::BuildFileEntryMap(file f, file fo, bool older_support)
 
 	if (!ReadHeaderData(pDest, m_CDREnd.lCDRSize, older_support))
 	{
-		printf("Failed to decrypt custom ReadHeaderData");
+		LOGMSG("Failed to decrypt custom ReadHeaderData");
 		return false;
 	}
 
@@ -242,7 +242,7 @@ bool ZipDir::BuildFileEntryMap(file f, file fo, bool older_support)
 	fseek_(fo, m_CDREnd.lCDROffset, SEEK_SET);
 	if (!fwrite_b(pDest, m_CDREnd.lCDRSize, fo))
 	{
-		printf("fwrite_b -> pDest");
+		LOGMSG("fwrite_b -> pDest");
 		return false;
 	}
 
@@ -257,7 +257,7 @@ bool ZipDir::BuildFileEntryMap(file f, file fo, bool older_support)
 		pFile->lSignature = 0;
 
 		if (pFile->nVersionNeeded > 20) {
-			printf("Cannot read the archive file (nVersionNeeded > 20).\n");
+			LOGMSG("Cannot read the archive file (nVersionNeeded > 20).\n");
 			return false;
 		}
 
@@ -265,7 +265,7 @@ bool ZipDir::BuildFileEntryMap(file f, file fo, bool older_support)
 
 		if (pEndOfRecord > pEndOfData)
 		{
-			printf("Central Directory record is either corrupt, or truncated, or missing. Cannot read the archive directory.\n");
+			LOGMSG("Central Directory record is either corrupt, or truncated, or missing. Cannot read the archive directory.\n");
 			return false;
 		}
 
@@ -275,7 +275,7 @@ bool ZipDir::BuildFileEntryMap(file f, file fo, bool older_support)
 		fseek_(f, pFile->lLocalHeaderOffset, SEEK_SET);
 		if (!fread_b(buf, nBufferLength + pFile->nExtraFieldLength + pFile->nFileCommentLength, f))
 		{
-			printf("fread_b -> pLocalFileHeader");
+			LOGMSG("fread_b -> pLocalFileHeader");
 			return false;
 		}
 
@@ -294,7 +294,7 @@ bool ZipDir::BuildFileEntryMap(file f, file fo, bool older_support)
 		fseek_(fo, pFile->lLocalHeaderOffset, SEEK_SET);
 		if (!fwrite_(pLocalFileHeader, nBufferLength + pFile->nExtraFieldLength + pFile->nFileCommentLength, fo))
 		{
-			printf("fwrite_b -> pLocalFileHeader");
+			LOGMSG("fwrite_b -> pLocalFileHeader");
 			return false;
 		}
 
@@ -304,13 +304,13 @@ bool ZipDir::BuildFileEntryMap(file f, file fo, bool older_support)
 		fseek_(f, nBufferLength + pFile->lLocalHeaderOffset, 0);
 		if (!fread_b(pSrc, pFile->desc.lSizeCompressed, f))
 		{
-			printf("fread_b -> pSrc");
+			LOGMSG("fread_b -> pSrc");
 			return false;
 		}
 
 
 		if (!Decrypt(pSrc, pFile->desc.lSizeCompressed, pFile->desc)) {
-			printf("Cannot decrypt file.");
+			LOGMSG("Cannot decrypt file.");
 			return false;
 		}
 
@@ -320,7 +320,7 @@ bool ZipDir::BuildFileEntryMap(file f, file fo, bool older_support)
 		fseek_(fo, nBufferLength + pFile->lLocalHeaderOffset, SEEK_SET);
 		if (!fwrite_b(pSrc, pFile->desc.lSizeCompressed, fo))
 		{
-			printf("fwrite_b -> pSrc");
+			LOGMSG("fwrite_b -> pSrc");
 			return false;
 		}
 
@@ -331,7 +331,7 @@ bool ZipDir::BuildFileEntryMap(file f, file fo, bool older_support)
 	fseek_(fo, m_CDREnd.lCDROffset, SEEK_SET);
 	if (!fwrite_b(pDest, m_CDREnd.lCDRSize, fo))
 	{
-		printf("fwrite_b -> pDest");
+		LOGMSG("fwrite_b -> pDest");
 		return false;
 	}
 
